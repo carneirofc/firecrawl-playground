@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Firecrawl playground</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#272b35; --fg:#d7dae0; --dim:#8a91a0; --acc:#b48cff; --ok:#5fd38d; --err:#ff6b6b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 12px 0 0; color:var(--acc); }
+  header input#base { width:320px; flex:0 1 320px; }
+  #health { font-size:12px; color:var(--dim); }
+  nav { display:flex; gap:2px; padding:0 16px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  nav button { background:none; border:none; color:var(--dim); padding:10px 14px; cursor:pointer; border-bottom:2px solid transparent; }
+  nav button.active { color:var(--fg); border-bottom-color:var(--acc); }
+  main { display:grid; grid-template-columns:minmax(320px,440px) 1fr; gap:16px; padding:16px; }
+  @media (max-width:900px){ main{ grid-template-columns:1fr; } }
+  section.form { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; display:none; }
+  section.form.active { display:block; }
+  label { display:block; margin:10px 0 4px; color:var(--dim); font-size:12px; }
+  input[type=text], input[type=number], textarea, select { width:100%; background:#0c0e12; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:7px 8px; font:13px ui-monospace,monospace; }
+  textarea { min-height:80px; resize:vertical; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; }
+  .checks { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:4px; }
+  .checks label { display:inline-flex; gap:5px; align-items:center; margin:0; color:var(--fg); font-size:13px; }
+  .actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  button.go { background:var(--acc); color:#140b24; border:none; border-radius:6px; padding:8px 16px; font-weight:600; cursor:pointer; }
+  button.sec { background:none; color:var(--fg); border:1px solid var(--line); border-radius:6px; padding:8px 12px; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .hint { font-size:12px; color:var(--dim); margin-top:8px; }
+  #out { background:var(--panel); border:1px solid var(--line); border-radius:8px; display:flex; flex-direction:column; min-height:70vh; overflow:hidden; }
+  #status { padding:8px 12px; border-bottom:1px solid var(--line); font-size:12px; color:var(--dim); display:flex; gap:12px; flex-wrap:wrap; }
+  #status .ok { color:var(--ok); } #status .err { color:var(--err); }
+  #views { display:flex; gap:2px; padding:0 8px; border-bottom:1px solid var(--line); }
+  #views button { background:none; border:none; color:var(--dim); padding:7px 10px; cursor:pointer; font-size:12px; }
+  #views button.active { color:var(--fg); box-shadow:inset 0 -2px var(--acc); }
+  #view { flex:1; overflow:auto; padding:12px; }
+  pre { margin:0; white-space:pre-wrap; word-break:break-word; font:12.5px/1.5 ui-monospace,monospace; }
+  img.shot { max-width:100%; border:1px solid var(--line); border-radius:6px; }
+  .md h1,.md h2,.md h3{ margin:.8em 0 .3em; } .md a{ color:var(--acc); } .md code{ background:#0c0e12; padding:1px 4px; border-radius:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Firecrawl playground</h1>
+  <label style="margin:0">API</label><input type="text" id="base">
+  <button class="sec" id="ping">Check</button>
+  <span id="health"></span>
+</header>
+<nav id="tabs"></nav>
+<main>
+  <div>
+    <!-- SCRAPE -->
+    <section class="form" data-tab="scrape" data-title="Scrape">
+      <label>URL</label><input type="text" id="s_url" value="https://example.com">
+      <label>Formats</label>
+      <div class="checks" id="s_formats"></div>
+      <div id="s_json" style="display:none">
+        <label>JSON prompt (LLM)</label><textarea id="s_prompt">Extract the page title and a one-line description.</textarea>
+        <label>JSON schema (optional)</label><textarea id="s_schema">{"type":"object","properties":{"title":{"type":"string"},"description":{"type":"string"}},"required":["title"]}</textarea>
+      </div>
+      <div class="checks" style="margin-top:10px">
+        <label><input type="checkbox" id="s_main" checked> onlyMainContent</label>
+        <label><input type="checkbox" id="s_mobile"> mobile</label>
+        <label><input type="checkbox" id="s_cache"> maxAge 0 (no cache)</label>
+      </div>
+      <div class="row">
+        <div><label>waitFor (ms)</label><input type="number" id="s_wait" value="0"></div>
+        <div><label>timeout (ms)</label><input type="number" id="s_timeout" value="60000"></div>
+      </div>
+      <div class="actions"><button class="go" data-run="scrape">Scrape</button></div>
+      <div class="hint">POST /v2/scrape. summary and json use the LLM (LiteLLM → Claude). screenshot needs the cloud-only fire-engine: self-hosted returns a warning and no image.</div>
+    </section>
+
+    <!-- MAP -->
+    <section class="form" data-tab="map" data-title="Map">
+      <label>URL</label><input type="text" id="m_url" value="https://docs.firecrawl.dev">
+      <label>search (filters/ranks URLs)</label><input type="text" id="m_search" placeholder="optional">
+      <div class="row">
+        <div><label>limit</label><input type="number" id="m_limit" value="100"></div>
+        <div><label>sitemap</label><select id="m_sitemap"><option>include</option><option>only</option><option>skip</option></select></div>
+      </div>
+      <div class="checks" style="margin-top:10px"><label><input type="checkbox" id="m_sub" checked> includeSubdomains</label></div>
+      <div class="actions"><button class="go" data-run="map">Map</button></div>
+      <div class="hint">POST /v2/map. URL discovery only, no scraping.</div>
+    </section>
+
+    <!-- CRAWL -->
+    <section class="form" data-tab="crawl" data-title="Crawl">
+      <label>URL</label><input type="text" id="c_url" value="https://example.com">
+      <div class="row">
+        <div><label>limit</label><input type="number" id="c_limit" value="5"></div>
+        <div><label>maxDiscoveryDepth</label><input type="number" id="c_depth" value="1"></div>
+      </div>
+      <label>includePaths (one regex per line)</label><textarea id="c_inc" style="min-height:44px"></textarea>
+      <label>excludePaths (one regex per line)</label><textarea id="c_exc" style="min-height:44px"></textarea>
+      <div class="row">
+        <div><label>sitemap</label><select id="c_sitemap"><option>include</option><option>only</option><option>skip</option></select></div>
+        <div><label>page format</label><select id="c_fmt"><option>markdown</option><option>html</option><option>links</option><option>summary</option></select></div>
+      </div>
+      <div class="checks" style="margin-top:10px">
+        <label><input type="checkbox" id="c_ext"> allowExternalLinks</label>
+        <label><input type="checkbox" id="c_subd"> allowSubdomains</label>
+      </div>
+      <div class="actions"><button class="go" data-run="crawl">Start crawl</button><button class="sec" id="c_cancel" disabled>Cancel</button></div>
+      <div class="hint">POST /v2/crawl, then polls GET /v2/crawl/:id. Keep limits small.</div>
+    </section>
+
+    <!-- BATCH -->
+    <section class="form" data-tab="batch" data-title="Batch scrape">
+      <label>URLs (one per line)</label><textarea id="b_urls">https://example.com
+https://www.iana.org/help/example-domains</textarea>
+      <label>format</label><select id="b_fmt"><option>markdown</option><option>html</option><option>links</option><option>summary</option></select>
+      <div class="actions"><button class="go" data-run="batch">Start batch</button></div>
+      <div class="hint">POST /v2/batch/scrape, then polls GET /v2/batch/scrape/:id.</div>
+    </section>
+
+    <!-- SEARCH -->
+    <section class="form" data-tab="search" data-title="Search">
+      <label>Query</label><input type="text" id="q_query" value="firecrawl self host">
+      <div class="row">
+        <div><label>limit</label><input type="number" id="q_limit" value="5"></div>
+        <div><label>lang</label><input type="text" id="q_lang" value="en"></div>
+      </div>
+      <div class="checks" style="margin-top:10px"><label><input type="checkbox" id="q_scrape"> also scrape results (markdown)</label></div>
+      <div class="actions"><button class="go" data-run="search">Search</button></div>
+      <div class="hint">POST /v2/search. Without SEARXNG_ENDPOINT it falls back to Firecrawl's built-in search scraping (works, but can be rate-limited by the engine).</div>
+    </section>
+
+    <!-- EXTRACT -->
+    <section class="form" data-tab="extract" data-title="Extract">
+      <label>URLs (one per line, /* wildcards allowed)</label><textarea id="e_urls">https://example.com</textarea>
+      <label>Prompt</label><textarea id="e_prompt">What is this page for?</textarea>
+      <label>Schema (optional)</label><textarea id="e_schema">{"type":"object","properties":{"purpose":{"type":"string"}},"required":["purpose"]}</textarea>
+      <div class="actions"><button class="go" data-run="extract">Extract</button></div>
+      <div class="hint">POST /v2/extract (deprecated upstream, still works), then polls. Multi-URL ranking needs embeddings, which Anthropic doesn't have.</div>
+    </section>
+
+    <!-- RAW -->
+    <section class="form" data-tab="raw" data-title="Raw request">
+      <div class="row">
+        <div style="flex:0 0 100px"><label>Method</label><select id="r_method"><option>POST</option><option>GET</option><option>DELETE</option></select></div>
+        <div><label>Path</label><input type="text" id="r_path" value="/v2/scrape"></div>
+      </div>
+      <label>JSON body</label><textarea id="r_body" style="min-height:220px">{
+  "url": "https://example.com",
+  "formats": ["markdown", "links"]
+}</textarea>
+      <div class="actions"><button class="go" data-run="raw">Send</button></div>
+      <div class="hint">Anything the API takes. Schemas: apps/api/src/controllers/v2/types.ts upstream.</div>
+    </section>
+  </div>
+
+  <div id="out">
+    <div id="status"><span>Idle.</span></div>
+    <div id="views"></div>
+    <div id="view"><pre class="dim">Results show up here.</pre></div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const FORMATS = ["markdown","html","rawHtml","links","images","summary","screenshot","json"];
+
+// API base: same origin when served by the playground container (which proxies /v1, /v2),
+// else the local API. Remembered in localStorage.
+const defBase = location.protocol === "file:" ? "http://127.0.0.1:3002" : location.origin;
+$("base").value = localStorage.getItem("fc_base") || defBase;
+$("base").onchange = () => localStorage.setItem("fc_base", $("base").value.replace(/\/+$/,""));
+const base = () => $("base").value.replace(/\/+$/,"");
+
+// Tabs
+const sections = [...document.querySelectorAll("section.form")];
+sections.forEach(s => {
+  const b = document.createElement("button");
+  b.textContent = s.dataset.title; b.dataset.tab = s.dataset.tab;
+  b.onclick = () => showTab(s.dataset.tab);
+  $("tabs").appendChild(b);
+});
+function showTab(t) {
+  sections.forEach(s => s.classList.toggle("active", s.dataset.tab === t));
+  [...$("tabs").children].forEach(b => b.classList.toggle("active", b.dataset.tab === t));
+  location.hash = t;
+}
+showTab((location.hash || "#scrape").slice(1));
+window.addEventListener("hashchange", () => showTab((location.hash || "#scrape").slice(1)));
+
+// Scrape format checkboxes
+FORMATS.forEach(f => {
+  const l = document.createElement("label");
+  l.innerHTML = `<input type="checkbox" value="${f}" ${f==="markdown"?"checked":""}> ${f}`;
+  $("s_formats").appendChild(l);
+});
+$("s_formats").onchange = () => { $("s_json").style.display = checked("s_formats").includes("json") ? "" : "none"; };
+function checked(id) { return [...$(id).querySelectorAll("input:checked")].map(i => i.value); }
+const lines = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
+const num = id => Number($(id).value);
+function parseJSON(id, label) {
+  const v = $(id).value.trim(); if (!v) return undefined;
+  try { return JSON.parse(v); } catch (e) { throw new Error(`${label}: invalid JSON (${e.message})`); }
+}
+
+// Output
+let last = null;
+function status(html) { $("status").innerHTML = html; }
+function render(result) {
+  last = result;
+  const views = buildViews(result);
+  $("views").innerHTML = "";
+  views.forEach((v, i) => {
+    const b = document.createElement("button"); b.textContent = v.name;
+    b.onclick = () => { [...$("views").children].forEach(x => x.classList.remove("active")); b.classList.add("active"); $("view").replaceChildren(v.render()); };
+    $("views").appendChild(b);
+    if (i === 0) b.click();
+  });
+}
+function pre(text) { const p = document.createElement("pre"); p.textContent = text; return p; }
+function buildViews(r) {
+  const v = [];
+  const data = r && (r.data ?? r);
+  const docs = Array.isArray(data) ? data : (data && typeof data === "object" ? [data] : []);
+  const first = docs.find(d => d && (d.markdown || d.summary || d.json || d.screenshot || d.links));
+  if (first?.markdown) v.push({ name: "Markdown", render: () => pre(docs.filter(d=>d.markdown).map(d => (docs.length>1?`# ${d.metadata?.sourceURL||d.url||""}\n\n`:"") + d.markdown).join("\n\n---\n\n")) });
+  if (first?.summary) v.push({ name: "Summary", render: () => pre(docs.filter(d=>d.summary).map(d=>d.summary).join("\n\n---\n\n")) });
+  if (first?.json) v.push({ name: "JSON result", render: () => pre(JSON.stringify(docs.length>1?docs.map(d=>d.json):first.json, null, 2)) });
+  const fmtLinks = ls => ls.map(l => typeof l === "string" ? l : `${l.url}${l.title?"  — "+l.title:""}`).join("\n");
+  if (first?.links) v.push({ name: `Links (${first.links.length})`, render: () => pre(fmtLinks(first.links)) });
+  if (data?.links && !first?.links) v.push({ name: `Links (${data.links.length})`, render: () => pre(fmtLinks(data.links)) });
+  // /v2/search: data.web / data.news / data.images
+  ["web","news","images"].forEach(k => { if (Array.isArray(data?.[k])) v.push({ name: `Search ${k} (${data[k].length})`, render: () => pre(data[k].map((x,i) => `${i+1}. ${x.title||""}\n   ${x.url||x.imageUrl||""}\n   ${x.description||x.snippet||""}${x.markdown?"\n\n"+x.markdown.slice(0,1500):""}`).join("\n\n")) }); });
+  // /v2/extract: data is the extracted object itself
+  if (r?.status && data && !Array.isArray(data) && !first && !["web","news","images"].some(k => data[k])) v.push({ name: "Extracted", render: () => pre(JSON.stringify(data, null, 2)) });
+  if (first?.screenshot) v.push({ name: "Screenshot", render: () => { const s = first.screenshot; const img = document.createElement("img"); img.className = "shot"; img.src = s.startsWith("http")||s.startsWith("data:") ? s : `data:image/png;base64,${s}`; return img; } });
+  if (first?.html || first?.rawHtml) v.push({ name: "HTML", render: () => pre(first.html || first.rawHtml) });
+  if (first?.metadata) v.push({ name: "Metadata", render: () => pre(JSON.stringify(first.metadata, null, 2)) });
+  v.push({ name: "Raw response", render: () => pre(JSON.stringify(r, null, 2)) });
+  return v;
+}
+
+async function call(method, path, body) {
+  const t0 = performance.now();
+  const res = await fetch(base() + path, { method, headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let json; try { json = JSON.parse(text); } catch { json = { _nonJson: text }; }
+  return { res, json, ms: Math.round(performance.now() - t0) };
+}
+function curlOf(method, path, body) {
+  return `curl -X ${method} ${base()}${path}` + (body ? ` -H 'Content-Type: application/json' -d '${JSON.stringify(body).replace(/'/g,"'\\''")}'` : "");
+}
+function statusLine(method, path, r, extra = "") {
+  const cls = r.res.ok && r.json.success !== false ? "ok" : "err";
+  const err = r.json.error ? ` — ${escapeHtml(String(r.json.error))}` : "";
+  const warn = r.json.data?.warning || r.json.warning ? ` · warning: ${escapeHtml(String(r.json.data?.warning || r.json.warning))}` : "";
+  return `<span class="${cls}">${r.res.status}</span><span>${method} ${path}</span><span>${r.ms} ms</span>${extra}<span>${err}${warn}</span>`;
+}
+const escapeHtml = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let pollAbort = null;
+async function poll(path, label, extraStatus) {
+  const ctl = { stop: false }; pollAbort = ctl;
+  for (let i = 0; i < 600 && !ctl.stop; i++) {
+    const r = await call("GET", path);
+    const st = r.json.status;
+    const prog = r.json.total != null ? ` ${r.json.completed ?? 0}/${r.json.total}` : "";
+    status(statusLine("GET", path, r, `<span>${label}: <b>${st ?? "?"}</b>${prog}</span>${extraStatus||""}`));
+    render(r.json);
+    if (!r.res.ok || ["completed","failed","cancelled"].includes(st)) return r;
+    await new Promise(res => setTimeout(res, 2000));
+  }
+}
+
+// Endpoint builders: return [method, path, body, asyncKind]
+const builders = {
+  scrape() {
+    const fmts = checked("s_formats").map(f => {
+      if (f === "json") { const o = { type: "json", prompt: $("s_prompt").value }; const s = parseJSON("s_schema", "schema"); if (s) o.schema = s; return o; }
+      return f;
+    });
+    const body = { url: $("s_url").value, formats: fmts, onlyMainContent: $("s_main").checked, timeout: num("s_timeout") };
+    if (num("s_wait")) body.waitFor = num("s_wait");
+    if ($("s_mobile").checked) body.mobile = true;
+    if ($("s_cache").checked) body.maxAge = 0;
+    return ["POST", "/v2/scrape", body];
+  },
+  map() {
+    const body = { url: $("m_url").value, limit: num("m_limit"), sitemap: $("m_sitemap").value, includeSubdomains: $("m_sub").checked };
+    if ($("m_search").value.trim()) body.search = $("m_search").value.trim();
+    return ["POST", "/v2/map", body];
+  },
+  crawl() {
+    const body = { url: $("c_url").value, limit: num("c_limit"), sitemap: $("c_sitemap").value,
+      allowExternalLinks: $("c_ext").checked, allowSubdomains: $("c_subd").checked,
+      scrapeOptions: { formats: [$("c_fmt").value], onlyMainContent: true } };
+    if ($("c_depth").value !== "") body.maxDiscoveryDepth = num("c_depth");
+    if (lines("c_inc").length) body.includePaths = lines("c_inc");
+    if (lines("c_exc").length) body.excludePaths = lines("c_exc");
+    return ["POST", "/v2/crawl", body, "/v2/crawl/"];
+  },
+  batch() { return ["POST", "/v2/batch/scrape", { urls: lines("b_urls"), formats: [$("b_fmt").value] }, "/v2/batch/scrape/"]; },
+  search() {
+    const body = { query: $("q_query").value, limit: num("q_limit"), lang: $("q_lang").value };
+    if ($("q_scrape").checked) body.scrapeOptions = { formats: ["markdown"], onlyMainContent: true };
+    return ["POST", "/v2/search", body];
+  },
+  extract() {
+    const body = { urls: lines("e_urls"), prompt: $("e_prompt").value };
+    const s = parseJSON("e_schema", "schema"); if (s) body.schema = s;
+    return ["POST", "/v2/extract", body, "/v2/extract/"];
+  },
+  raw() {
+    const m = $("r_method").value; const b = m === "GET" ? undefined : parseJSON("r_body", "body");
+    return [m, $("r_path").value, b];
+  },
+};
+
+document.querySelectorAll("[data-run]").forEach(btn => btn.onclick = async () => {
+  const kind = btn.dataset.run;
+  if (pollAbort) pollAbort.stop = true;
+  btn.disabled = true;
+  try {
+    const [method, path, body, pollPrefix] = builders[kind]();
+    console.log(curlOf(method, path, body));
+    status(`<span>Running ${method} ${path}…</span><span style="cursor:pointer;text-decoration:underline" id="cp">copy as curl</span>`);
+    $("cp").onclick = () => navigator.clipboard.writeText(curlOf(method, path, body));
+    const r = await call(method, path, body);
+    status(statusLine(method, path, r));
+    render(r.json);
+    if (pollPrefix && r.res.ok && r.json.id) {
+      const id = r.json.id;
+      if (kind === "crawl") { $("c_cancel").disabled = false; $("c_cancel").onclick = async () => { pollAbort && (pollAbort.stop = true); const c = await call("DELETE", `/v2/crawl/${id}`); status(statusLine("DELETE", `/v2/crawl/${id}`, c)); render(c.json); $("c_cancel").disabled = true; }; }
+      await poll(pollPrefix + id, `${kind} ${id.slice(0,8)}`);
+      if (kind === "crawl") $("c_cancel").disabled = true;
+    }
+  } catch (e) {
+    status(`<span class="err">Error</span><span>${escapeHtml(e.message)}</span>`);
+    $("view").replaceChildren(pre(String(e.stack || e)));
+  } finally { btn.disabled = false; }
+});
+
+// Health check
+$("ping").onclick = async () => {
+  $("health").textContent = "…";
+  try { const r = await call("GET", "/"); $("health").innerHTML = r.res.ok ? `<span style="color:var(--ok)">up</span> · ${r.ms} ms` : `<span style="color:var(--err)">${r.res.status}</span>`; }
+  catch (e) { $("health").innerHTML = `<span style="color:var(--err)">unreachable</span> (${escapeHtml(e.message)})`; }
+};
+$("ping").click();
+</script>
+</body>
+</html>

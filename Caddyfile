@@ -1,0 +1,13 @@
+# Serves the playground and proxies the API on the same origin.
+:8080 {
+	handle /v1/* {
+		reverse_proxy {$FIRECRAWL_UPSTREAM:api:3002}
+	}
+	handle /v2/* {
+		reverse_proxy {$FIRECRAWL_UPSTREAM:api:3002}
+	}
+	handle {
+		root * /srv
+		file_server
+	}
+}

@@ -1,0 +1,12 @@
+{
+  "name": "firecrawl-playground-tests",
+  "private": true,
+  "description": "Unit tests for www/render.js (the page itself has no build step)",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "30.1.3"
+  }
+}

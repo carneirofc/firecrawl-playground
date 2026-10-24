@@ -54,19 +54,51 @@ function render(result) {
   });
 }
 function pre(text) { const p = document.createElement("pre"); p.textContent = text; return p; }
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const srcOf = d => d?.metadata?.sourceURL || d?.url || "";
+// Markdown rendered as sanitised HTML (render.js); relative links resolve against the page's final URL.
+function mdDocs(docs, key) {
+  const box = el("div");
+  docs.filter(d => d[key]).forEach((d, i) => {
+    if (i) box.appendChild(el("hr", "doc-sep"));
+    if (docs.length > 1) box.appendChild(el("div", "md-src", srcOf(d)));
+    box.appendChild(FcRender.markdownView(d[key], d.metadata?.url || srcOf(d)));
+  });
+  return box;
+}
+function searchView(items) {
+  const ol = el("ol", "results");
+  items.forEach(x => {
+    const li = el("li"), url = x.url || x.imageUrl || "";
+    const a = el("a", null, x.title || url || "(untitled)");
+    if (/^https?:\/\//i.test(url)) { a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; }
+    li.append(a, el("div", "dim", url));
+    if (x.description || x.snippet) li.appendChild(el("div", null, x.description || x.snippet));
+    if (x.markdown) {
+      const det = el("details"); det.appendChild(el("summary", null, "Markdown"));
+      det.appendChild(FcRender.markdownView(x.markdown, x.metadata?.url || url));
+      li.appendChild(det);
+    }
+    ol.appendChild(li);
+  });
+  return ol;
+}
 function buildViews(r) {
   const v = [];
   const data = r && (r.data ?? r);
   const docs = Array.isArray(data) ? data : (data && typeof data === "object" ? [data] : []);
   const first = docs.find(d => d && (d.markdown || d.summary || d.json || d.screenshot || d.links));
-  if (first?.markdown) v.push({ name: "Markdown", render: () => pre(docs.filter(d=>d.markdown).map(d => (docs.length>1?`# ${d.metadata?.sourceURL||d.url||""}\n\n`:"") + d.markdown).join("\n\n---\n\n")) });
-  if (first?.summary) v.push({ name: "Summary", render: () => pre(docs.filter(d=>d.summary).map(d=>d.summary).join("\n\n---\n\n")) });
+  if (first?.markdown) {
+    v.push({ name: "Markdown", render: () => mdDocs(docs, "markdown") });
+    v.push({ name: "Markdown (raw)", render: () => pre(docs.filter(d=>d.markdown).map(d => (docs.length>1?`# ${srcOf(d)}\n\n`:"") + d.markdown).join("\n\n---\n\n")) });
+  }
+  if (first?.summary) v.push({ name: "Summary", render: () => mdDocs(docs, "summary") });
   if (first?.json) v.push({ name: "JSON result", render: () => pre(JSON.stringify(docs.length>1?docs.map(d=>d.json):first.json, null, 2)) });
   const fmtLinks = ls => ls.map(l => typeof l === "string" ? l : `${l.url}${l.title?"  — "+l.title:""}`).join("\n");
   if (first?.links) v.push({ name: `Links (${first.links.length})`, render: () => pre(fmtLinks(first.links)) });
   if (data?.links && !first?.links) v.push({ name: `Links (${data.links.length})`, render: () => pre(fmtLinks(data.links)) });
   // /v2/search: data.web / data.news / data.images
-  ["web","news","images"].forEach(k => { if (Array.isArray(data?.[k])) v.push({ name: `Search ${k} (${data[k].length})`, render: () => pre(data[k].map((x,i) => `${i+1}. ${x.title||""}\n   ${x.url||x.imageUrl||""}\n   ${x.description||x.snippet||""}${x.markdown?"\n\n"+x.markdown.slice(0,1500):""}`).join("\n\n")) }); });
+  ["web","news","images"].forEach(k => { if (Array.isArray(data?.[k])) v.push({ name: `Search ${k} (${data[k].length})`, render: () => searchView(data[k]) }); });
   // /v2/extract: data is the extracted object itself
   if (r?.status && data && !Array.isArray(data) && !first && !["web","news","images"].some(k => data[k])) v.push({ name: "Extracted", render: () => pre(JSON.stringify(data, null, 2)) });
   if (first?.screenshot) v.push({ name: "Screenshot", render: () => { const s = first.screenshot; const img = document.createElement("img"); img.className = "shot"; img.src = s.startsWith("http")||s.startsWith("data:") ? s : `data:image/png;base64,${s}`; return img; } });

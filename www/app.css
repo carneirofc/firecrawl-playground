@@ -32,7 +32,32 @@ button:disabled { opacity:.5; cursor:wait; }
 #view { flex:1; overflow:auto; padding:12px; }
 pre { margin:0; white-space:pre-wrap; word-break:break-word; font:12.5px/1.5 ui-monospace,monospace; }
 img.shot { max-width:100%; border:1px solid var(--line); border-radius:6px; }
-.md h1,.md h2,.md h3{ margin:.8em 0 .3em; } .md a{ color:var(--acc); } .md code{ background:#0c0e12; padding:1px 4px; border-radius:4px; }
+.dim { color:var(--dim); }
+/* Rendered (sanitised) Markdown */
+.md { line-height:1.6; overflow-wrap:anywhere; max-width:80em; }
+.md > :first-child { margin-top:0; }
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6 { margin:1em 0 .4em; line-height:1.25; }
+.md h1 { font-size:1.6em; } .md h2 { font-size:1.35em; } .md h3 { font-size:1.15em; } .md h4,.md h5,.md h6 { font-size:1em; }
+.md p,.md ul,.md ol,.md blockquote,.md pre,.md table { margin:0 0 .8em; }
+.md ul,.md ol { padding-left:1.6em; }
+.md a { color:var(--acc); }
+.md code { background:#0c0e12; padding:1px 4px; border-radius:4px; font:12.5px ui-monospace,monospace; }
+.md pre { background:#0c0e12; border:1px solid var(--line); border-radius:6px; padding:10px; overflow:auto; white-space:pre; }
+.md pre code { background:none; padding:0; }
+.md blockquote { border-left:3px solid var(--acc); margin-left:0; padding:.2em 0 .2em 1em; color:var(--dim); }
+.md table { border-collapse:collapse; display:block; overflow-x:auto; max-width:100%; }
+.md th,.md td { border:1px solid var(--line); padding:4px 8px; text-align:left; vertical-align:top; }
+.md th { background:#0c0e12; }
+.md tr:nth-child(even) td { background:rgba(255,255,255,.02); }
+.md img { max-width:100%; height:auto; }
+.md hr,hr.doc-sep { border:none; border-top:1px solid var(--line); margin:1.2em 0; }
+.md-src { font:12px ui-monospace,monospace; color:var(--dim); margin-bottom:.6em; }
+ol.results { margin:0; padding-left:1.6em; }
+ol.results > li { margin-bottom:1em; }
+ol.results .dim { font:12px ui-monospace,monospace; overflow-wrap:anywhere; }
+ol.results details { margin-top:.4em; }
+ol.results summary { cursor:pointer; color:var(--dim); }
+ol.results details .md { margin-top:.6em; padding-left:.8em; border-left:1px solid var(--line); }
 label.inline { margin:0; }
 .checks.spaced { margin-top:10px; }
 textarea.short { min-height:44px; }

@@ -4,7 +4,15 @@
 // before it reaches the DOM. Needs vendor/marked.umd.js and vendor/purify.min.js.
 (function (global) {
   "use strict";
-  const md = new global.marked.Marked({ gfm: true, async: false });
+  const md = new global.marked.Marked({
+    gfm: true, async: false,
+    // Drop <style> and style="" from raw HTML before DOMPurify parses it: the
+    // CSP would block them anyway, but parsing them logs a violation each.
+    // Not a security boundary (DOMPurify removes both regardless).
+    walkTokens(t) {
+      if (t.type === "html") t.text = t.text.replace(/<style\b[\s\S]*?(<\/style\s*>|$)/gi, "").replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    },
+  });
   const purify = global.DOMPurify(global);
 
   const CONFIG = {
